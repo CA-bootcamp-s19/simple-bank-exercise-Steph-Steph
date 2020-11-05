@@ -4,104 +4,63 @@
     https://solidity.readthedocs.io/en/v0.6.12/060-breaking-changes.html
 */
 
-pragma solidity ^0.6.12;
+pragma solidity ^0.5.8;
 
 contract SimpleBank {
-
-    //
-    // State variables
-    //
-    
-    /* Fill in the keyword. Hint: We want to protect our users balance from other contracts*/
+    uint8 private clientCount;
     mapping (address => uint) private balances;
-    
-    /* Fill in the keyword. We want to create a getter function and allow contracts to be able to see if a user is enrolled.  */
-    mapping (address => bool) public enrolled;
-
-    /* Let's make sure everyone knows who owns the bank. Use the appropriate keyword for this*/
     address public owner;
-    
-    //
-    // Events - publicize actions to external listeners
-    //
-    
-    /* Add an argument for this event, an accountAddress */
-    event LogEnrolled(address accountAddress);
 
-    /* Add 2 arguments for this event, an accountAddress and an amount */
-    event LogDepositMade(address accountAddress, uint amount);
+  // Log the event about a deposit being made by an address and its amount
+    event LogDepositMade(address indexed accountAddress, uint amount);
 
-    /* Create an event called LogWithdrawal */
-    /* Add 3 arguments for this event, an accountAddress, withdrawAmount and a newBalance */
-    event LogWithdrawal(address accountAddress, uint withdrawAmount, uint newBalance);
-
-    //
-    // Functions
-    //
-
-    /* Use the appropriate global variable to get the sender of the transaction */
-    constructor() public {
+    // Constructor is "payable" so it can receive the initial funding of 30, 
+    // required to reward the first 3 clients
+    constructor() public payable {
+        require(msg.value == 30 ether, "30 ether initial funding required");
         /* Set the owner to the creator of this contract */
         owner = msg.sender;
+        clientCount = 0;
     }
 
-    // Fallback function - Called if other functions don't match call or
-    // sent ether without data
-    // Typically, called when invalid data is sent
-    // Added so ether sent to this contract is reverted if the contract fails
-    // otherwise, the sender's money is transferred to contract
-    fallback() external payable {
-        revert();
+    /// @notice Enroll a customer with the bank, 
+    /// giving the first 3 of them 10 ether as reward
+    /// @return The balance of the user after enrolling
+    function enroll() public returns (uint) {
+        if (clientCount < 3) {
+            clientCount++;
+            balances[msg.sender] = 10 ether;
+        }
+        return balances[msg.sender];
     }
 
-    /// @notice Get balance
-    /// @return The balance of the user
-    // A SPECIAL KEYWORD prevents function from editing state variables;
-    // allows function to run locally/off blockchain
-    function getBalance() public view returns (uint) {
-        /* Get the balance of the sender of this transaction */
-         return balances[msg.sender];
-    }
-
-    /// @notice Enroll a customer with the bank
-    /// @return The users enrolled status
-    // Emit the appropriate event
-    function enroll() public returns (bool){
-        address bank_customer = msg.sender;
-        enrolled[bank_customer] = true;
-        emit LogEnrolled(bank_customer);
-    }
-
-    /// @notice Deposit ether into bank
+    /// @notice Deposit ether into bank, requires method is "payable"
     /// @return The balance of the user after the deposit is made
-    // Add the appropriate keyword so that this function can receive ether
-    // Use the appropriate global variables to get the transaction sender and value
-    // Emit the appropriate event    
-    // Users should be enrolled before they can make deposits
     function deposit() public payable returns (uint) {
-        /* Add the amount to the user's balance, call the event associated with a deposit,
-          then return the balance of the user */
-		balances[msg.sender] += msg.value;
+        balances[msg.sender] += msg.value;
         emit LogDepositMade(msg.sender, msg.value);
         return balances[msg.sender];
-}
+    }
+
     /// @notice Withdraw ether from bank
-    /// @dev This does not return any excess ether sent to it
-    /// @param withdrawAmount amount you want to withdraw
     /// @return The balance remaining for the user
-    // Emit the appropriate event    
     function withdraw(uint withdrawAmount) public returns (uint remainingBal) {
-        /* If the sender's balance is at least the amount they want to withdraw,
-           Subtract the amount from the sender's balance, and try to send that amount of ether
-           to the user attempting to withdraw. 
-           return the user's balance.*/
+        // Check enough balance available, otherwise just return balance
         if (withdrawAmount <= balances[msg.sender]) {
             balances[msg.sender] -= withdrawAmount;
             msg.sender.transfer(withdrawAmount);
         }
         return balances[msg.sender];
-    
-
     }
 
+    /// @notice Just reads balance of the account requesting, so "constant"
+    /// @return The balance of the user
+    function balance() public view returns (uint) {
+        return balances[msg.sender];
+    }
+
+    /// @return The balance of the Simple Bank contract
+    function depositsBalance() public view returns (uint) {
+        return address(this).balance;
+    }
 }
